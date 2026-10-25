@@ -1,7 +1,7 @@
 import { gamesIn, makeCtx, simulate } from "./lineup";
 import { pointsPerGame, scoringItems } from "./scoring";
 import { roster, teamName } from "./weekly";
-import type { Player, Snapshot } from "../types";
+import type { Player, ScoringItem, Snapshot } from "../types";
 
 // Playoff planner (F7, F8), trade evaluator (F9) and the playoff-mode switch (F10).
 
@@ -78,6 +78,54 @@ export function buildPlayoffView(snap: Snapshot): PlayoffView {
   return { weeks, rows, flagged, targets };
 }
 
+// Rest of season ends with the last fantasy playoff week; later NBA games don't count.
+export function restOfSeasonSps(snap: Snapshot): number[] {
+  const finalPeriod = snap.playoffMatchupPeriods.slice(0, 3).at(-1);
+  const lastSp = finalPeriod
+    ? Math.max(...(snap.matchupPeriods[finalPeriod] ?? [0]))
+    : Math.max(...Object.keys(snap.scoringPeriodDates).map(Number));
+  return Array.from({ length: Math.max(0, lastSp - snap.currentScoringPeriod + 1) }, (_, i) => snap.currentScoringPeriod + i);
+}
+
+export function playoffSpsOf(snap: Snapshot): number[] {
+  return snap.playoffMatchupPeriods.slice(0, 3).flatMap((p) => snap.matchupPeriods[p] ?? []);
+}
+
+export function freeAgentsByValue(snap: Snapshot, items: ScoringItem[]): Player[] {
+  return Object.values(snap.players)
+    .filter((p) => p.onTeamId === 0 && p.injuryStatus !== "OUT")
+    .sort((a, b) => pointsPerGame(b, items) - pointsPerGame(a, items));
+}
+
+// A team's roster after a trade. Taking on more players means cutting the lowest-value ones;
+// sending out more frees spots, which the team fills with the best free agents.
+export function swapRoster(
+  snap: Snapshot,
+  items: ScoringItem[],
+  current: Player[],
+  outIds: number[],
+  incoming: Player[],
+  freeAgents: Player[],
+): { after: Player[]; dropped: Player[]; pickedUp: Player[] } {
+  let after = [...current.filter((p) => !outIds.includes(p.id)), ...incoming];
+  const dropped: Player[] = [];
+  const pickedUp: Player[] = [];
+  const extra = after.length - current.length;
+  if (extra > 0) {
+    const cut = after
+      .filter((p) => !incoming.includes(p) && p.lineupSlotId !== 13)
+      .sort((a, b) => pointsPerGame(a, items) - pointsPerGame(b, items))
+      .slice(0, extra);
+    dropped.push(...cut);
+    after = after.filter((p) => !cut.includes(p));
+  } else if (extra < 0) {
+    const fas = freeAgents.filter((p) => !after.includes(p)).slice(0, -extra);
+    pickedUp.push(...fas);
+    after.push(...fas);
+  }
+  return { after, dropped, pickedUp };
+}
+
 export interface TradeResult {
   give: Player[];
   get: Player[];
@@ -95,34 +143,9 @@ export function evaluateTrade(snap: Snapshot, giveIds: number[], getIds: number[
   const get = getIds.map((id) => snap.players[id]).filter(Boolean);
   const current = roster(snap, snap.myTeamId);
 
-  let after = [...current.filter((p) => !giveIds.includes(p.id)), ...get];
-  const dropped: Player[] = [];
-  const pickedUp: Player[] = [];
-  const extra = after.length - current.length;
-  if (extra > 0) {
-    const cut = after
-      .filter((p) => !getIds.includes(p.id) && p.lineupSlotId !== 13)
-      .sort((a, b) => pointsPerGame(a, items) - pointsPerGame(b, items))
-      .slice(0, extra);
-    dropped.push(...cut);
-    after = after.filter((p) => !cut.includes(p));
-  } else if (extra < 0) {
-    // A 2-for-1 frees a roster spot: assume Dylan fills it with the best free agent.
-    const fas = Object.values(snap.players)
-      .filter((p) => p.onTeamId === 0 && p.injuryStatus !== "OUT")
-      .sort((a, b) => pointsPerGame(b, items) - pointsPerGame(a, items))
-      .slice(0, -extra);
-    pickedUp.push(...fas);
-    after.push(...fas);
-  }
-
-  // Rest of season ends with the last fantasy playoff week; later NBA games don't count.
-  const finalPeriod = snap.playoffMatchupPeriods.slice(0, 3).at(-1);
-  const lastSp = finalPeriod
-    ? Math.max(...(snap.matchupPeriods[finalPeriod] ?? [0]))
-    : Math.max(...Object.keys(snap.scoringPeriodDates).map(Number));
-  const restSps = Array.from({ length: Math.max(0, lastSp - snap.currentScoringPeriod + 1) }, (_, i) => snap.currentScoringPeriod + i);
-  const playoffSps = snap.playoffMatchupPeriods.slice(0, 3).flatMap((p) => snap.matchupPeriods[p] ?? []);
+  const { after, dropped, pickedUp } = swapRoster(snap, items, current, giveIds, get, freeAgentsByValue(snap, items));
+  const restSps = restOfSeasonSps(snap);
+  const playoffSps = playoffSpsOf(snap);
 
   const ros = { before: simulate(ctx, current, restSps).points, after: simulate(ctx, after, restSps).points, net: 0 };
   ros.net = ros.after - ros.before;

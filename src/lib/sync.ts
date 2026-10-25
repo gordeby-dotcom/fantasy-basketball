@@ -14,6 +14,7 @@ import {
   parseTeams,
 } from "./espn/parse";
 import { STAT } from "./espn/constants";
+import { findTrades } from "./analysis/trades";
 import type { MatchupActuals, Player, Snapshot, SourceStatus } from "./types";
 
 const SNAPSHOT_KEY = "snapshot";
@@ -59,6 +60,23 @@ function applyBbm(player: Player, row: BbmProjection): Player {
     bbmGames: row.games,
     bbmWeight: weight,
   };
+}
+
+// How well a player is playing lately counts for 30% of his value, once he has 5+ games in the last 15 days.
+export const FORM_WEIGHT = 0.3;
+export const FORM_MIN_GAMES = 5;
+
+function applyForm(players: Record<number, Player>): void {
+  for (const p of Object.values(players)) {
+    const games = p.recent?.[STAT.GP] ?? 0;
+    if (!p.recent || games < FORM_MIN_GAMES || p.projSource === "none") continue;
+    const recent = completeStatLine(p.recent, p.proj);
+    const blended: Record<number, number> = {};
+    for (const id of new Set([...Object.keys(p.proj), ...Object.keys(recent)].map(Number))) {
+      blended[id] = (1 - FORM_WEIGHT) * (p.proj[id] ?? 0) + FORM_WEIGHT * (recent[id] ?? 0);
+    }
+    players[p.id] = { ...p, projSeason: p.proj, proj: blended, formWeight: FORM_WEIGHT };
+  }
 }
 
 function mergeBbm(players: Record<number, Player>, rows: BbmProjection[]): number {
@@ -135,6 +153,15 @@ async function loadActuals(
   }
 }
 
+function safeTradeIdeas(snapshot: Snapshot): Snapshot["tradeIdeas"] {
+  try {
+    return findTrades(snapshot);
+  } catch (err) {
+    console.error("Trade finder failed:", err instanceof Error ? err.message : "unknown error");
+    return [];
+  }
+}
+
 export async function runSync(): Promise<Snapshot> {
   const season = env.espn.season();
   const previous = await getSnapshot();
@@ -165,6 +192,7 @@ export async function runSync(): Promise<Snapshot> {
 
     const bbm = await bbmPromise;
     const matched = mergeBbm(players, bbm.rows);
+    applyForm(players);
     if (bbm.status.ok && bbm.rows.length > 0 && matched === 0) {
       bbm.status = { ok: false, at: bbm.status.at, message: "Basketball Monster names didn't match ESPN players. Using ESPN projections." };
     }
@@ -208,6 +236,7 @@ export async function runSync(): Promise<Snapshot> {
       actuals,
       sources: { espn: { ok: true, at: Date.now() }, bbm: bbm.status },
     };
+    snapshot.tradeIdeas = safeTradeIdeas(snapshot);
     await setValue(SNAPSHOT_KEY, snapshot);
     return snapshot;
   } catch (err) {

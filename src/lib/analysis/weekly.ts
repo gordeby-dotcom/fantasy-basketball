@@ -1,7 +1,8 @@
 import { STAT } from "../espn/constants";
 import { firstAvailableSp, gamesIn, isAvailable, makeCtx, playsOn, simulate, type Ctx, type DayPlan } from "./lineup";
 import { isPointsLeague, pointsPerGame, projectionGap, scoringItems, statLong, statShort, type ProjectionGap } from "./scoring";
-import type { Player, Snapshot } from "../types";
+import { formOf } from "./value";
+import type { Player, ScoringItem, Snapshot } from "../types";
 
 export function roster(snap: Snapshot, teamId: number): Player[] {
   const team = snap.teams.find((t) => t.id === teamId);
@@ -198,10 +199,14 @@ function fmt(n: number): string {
   return Math.round(n).toString();
 }
 
-export function suggestMoves(snap: Snapshot, closeStats: number[] = [], count = 3): Suggestion[] {
+// "week": streaming for games left this week (playoff mode). "season": better players for the rest of the
+// season, counting recent form, regardless of who plays most this week (regular season).
+export type MoveMode = "week" | "season";
+
+export function suggestMoves(snap: Snapshot, closeStats: number[] = [], count = 3, mode: MoveMode = "week", seasonSps: number[] = []): Suggestion[] {
   const items = scoringItems(snap);
   const ctx: Ctx = makeCtx(snap, items);
-  const { sps } = focusPeriod(snap);
+  const sps = mode === "season" && seasonSps.length ? seasonSps : focusPeriod(snap).sps;
   const mine = roster(snap, snap.myTeamId);
   const baseline = simulate(ctx, mine, sps);
   const ppg = (p: Player) => pointsPerGame(p, items);
@@ -222,7 +227,7 @@ export function suggestMoves(snap: Snapshot, closeStats: number[] = [], count = 
     for (const drop of drops) {
       const sim = simulate(ctx, [...mine.filter((p) => p.id !== drop.id), add], sps);
       const gain = sim.points - baseline.points;
-      if (gain < 3) continue;
+      if (gain < (mode === "season" ? 40 : 3)) continue;
       options.push({
         add,
         drop,
@@ -250,11 +255,23 @@ export function suggestMoves(snap: Snapshot, closeStats: number[] = [], count = 
     if (usedDrops.has(o.drop.id) || usedAdds.has(o.add.id)) continue;
     usedDrops.add(o.drop.id);
     usedAdds.add(o.add.id);
-    o.reason = reasonFor(o, items, closeStats);
+    o.reason = mode === "season" ? seasonReason(o, items) : reasonFor(o, items, closeStats);
     picked.push(o);
     if (picked.length === count) break;
   }
   return picked;
+}
+
+function seasonReason(o: Suggestion, items: ScoringItem[]): string {
+  const addForm = formOf(o.add, items);
+  const dropForm = formOf(o.drop, items);
+  const hot = addForm.trend === "hot" && addForm.recentPpg !== null ? ` and is hot (${fmt(addForm.recentPpg)} a game lately)` : "";
+  const cold = dropForm.trend === "cold" && dropForm.recentPpg !== null ? `; ${o.drop.name} has cooled off (${fmt(dropForm.recentPpg)} lately)` : "";
+  const perGame =
+    o.addPpg > o.dropPpg + 1
+      ? `Scores ${fmt(o.addPpg)} a game vs ${fmt(o.dropPpg)}`
+      : `About the same per game (${fmt(o.addPpg)} vs ${fmt(o.dropPpg)}), but more of his games land on days you have open lineup spots`;
+  return `${perGame}${hot}${cold}: about +${fmt(o.gain)} points the rest of the season.`;
 }
 
 function reasonFor(o: Suggestion, items: ReturnType<typeof scoringItems>, closeStats: number[]): string {

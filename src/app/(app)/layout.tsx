@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { RefreshButton } from "@/components/RefreshButton";
 import { ago } from "@/lib/format";
@@ -23,7 +24,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <h1 className="truncate text-xl font-bold">Dylan&apos;s Game Plan</h1>
           <p className="text-xs text-muted">{snap ? `Updated ${ago(snap.syncedAt)}` : "Not synced yet"}</p>
         </div>
-        <RefreshButton />
+        <div className="flex items-center gap-2">
+          <Link href="/learn" aria-label="Learn the strategy" className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-card text-lg">
+            💡
+          </Link>
+          <RefreshButton />
+        </div>
       </header>
       <div className="mx-auto max-w-3xl px-4">
         <Nav />

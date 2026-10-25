@@ -1,59 +1,134 @@
 import Link from "next/link";
 import { Card, GapNote, Pill, PlayerName } from "@/components/ui";
 import { Term } from "@/components/Term";
-import { analyzeMatchup, suggestMoves, type MatchupView, type StatRow } from "@/lib/analysis/weekly";
-import { buildPlayoffView, playoffMode } from "@/lib/analysis/playoffs";
+import { GroupedTradeIdeas } from "@/components/TradeIdeas";
+import { analyzeMatchup, roster, suggestMoves, type MatchupView, type StatRow, type Suggestion } from "@/lib/analysis/weekly";
+import { buildPlayoffView, playoffMode, restOfSeasonSps } from "@/lib/analysis/playoffs";
+import { scoringItems } from "@/lib/analysis/scoring";
+import { formOf } from "@/lib/analysis/value";
 import { dayShort, monthDay, pts, signed } from "@/lib/format";
 import { getSnapshot } from "@/lib/sync";
 import type { Snapshot } from "@/lib/types";
 
 export default async function Home() {
   const snap = (await getSnapshot()) as Snapshot;
+  const items = scoringItems(snap);
   const matchup = analyzeMatchup(snap);
-  const moves = suggestMoves(snap, matchup.stats.filter((s) => s.label === "close").map((s) => s.statId));
   const playoffs = playoffMode(snap);
+  const closeStats = matchup.stats.filter((s) => s.label === "close").map((s) => s.statId);
+  // Regular season: pickups are about better players for the long run. Playoffs: games this week.
+  const moves = playoffs ? suggestMoves(snap, closeStats) : suggestMoves(snap, closeStats, 3, "season", restOfSeasonSps(snap));
+  const bbm = Object.values(snap.players).some((p) => p.projSource === "bbm");
 
+  const movesCard = (
+    <MovesCard
+      moves={moves}
+      title={playoffs ? "Best moves this week" : "Best pickups"}
+      footer={
+        playoffs ? (
+          <>
+            Why? <Term k="streaming">Streaming</Term> players with more games adds points, and it matters most in the playoffs.
+          </>
+        ) : (
+          <>Based on points per game for the rest of the season, including how they&apos;ve played lately.</>
+        )
+      }
+    />
+  );
+
+  if (playoffs) {
+    return (
+      <div className="flex flex-col gap-4">
+        <PlayoffHeadline snap={snap} />
+        <MatchupCard m={matchup} bbm={bbm} playoffs />
+        {movesCard}
+        <StatsCard m={matchup} />
+        <LineupGaps m={matchup} />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-4">
-      {playoffs && <PlayoffHeadline snap={snap} />}
-      <MatchupCard m={matchup} bbm={Object.values(snap.players).some((p) => p.projSource === "bbm")} />
-      <Card title="Best moves" aside={<span className="text-xs text-muted">Make these in the ESPN app</span>}>
-        {moves.length === 0 ? (
-          <p className="text-muted">No pickup beats your current roster for the rest of this week. Nice.</p>
-        ) : (
-          <ol className="flex flex-col gap-3">
-            {moves.map((m, i) => (
-              <li key={m.add.id} className="rounded-xl bg-bg p-3">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">{i + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-x-2">
-                      <span className="text-good font-bold">Add</span> <PlayerName player={m.add} /> <GapNote gap={m.addGap} />
-                    </p>
-                    <p className="flex flex-wrap items-center gap-x-2">
-                      <span className="text-bad font-bold">Drop</span> <PlayerName player={m.drop} /> <GapNote gap={m.dropGap} />
-                    </p>
-                    <p className="mt-1.5 text-sm">{m.reason}</p>
-                    {m.waiverNote && <p className="mt-1 text-sm text-warn">{m.waiverNote}</p>}
-                  </div>
-                  <Pill tone="good">{signed(m.gain)}</Pill>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-        <p className="mt-3 text-sm text-muted">
-          Why? <Term k="streaming">Streaming</Term> players with more games adds points.
-        </p>
+      <MatchupCard m={matchup} bbm={bbm} playoffs={false} />
+      <Card title="Trade ideas" aside={<Link href="/trade" className="text-sm font-semibold text-accent">All {snap.tradeIdeas?.length ?? 0} ideas →</Link>}>
+        <GroupedTradeIdeas ideas={snap.tradeIdeas ?? []} snap={snap} items={items} perGroup={1} />
       </Card>
+      <FormCard snap={snap} />
+      {movesCard}
       <StatsCard m={matchup} />
       <LineupGaps m={matchup} />
-      {!playoffs && <PlayoffHeadline snap={snap} quiet />}
+      <PlayoffHeadline snap={snap} quiet />
     </div>
   );
 }
 
-function MatchupCard({ m, bbm }: { m: MatchupView; bbm: boolean }) {
+function MovesCard({ moves, title, footer }: { moves: Suggestion[]; title: string; footer: React.ReactNode }) {
+  return (
+    <Card title={title} aside={<span className="text-xs text-muted">Make these in the ESPN app</span>}>
+      {moves.length === 0 ? (
+        <p className="text-muted">No pickup beats your current roster. Nice.</p>
+      ) : (
+        <ol className="flex flex-col gap-3">
+          {moves.map((m, i) => (
+            <li key={m.add.id} className="rounded-xl bg-bg p-3">
+              <div className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-x-2">
+                    <span className="text-good font-bold">Add</span> <PlayerName player={m.add} /> <GapNote gap={m.addGap} />
+                  </p>
+                  <p className="flex flex-wrap items-center gap-x-2">
+                    <span className="text-bad font-bold">Drop</span> <PlayerName player={m.drop} /> <GapNote gap={m.dropGap} />
+                  </p>
+                  <p className="mt-1.5 text-sm">{m.reason}</p>
+                  {m.waiverNote && <p className="mt-1 text-sm text-warn">{m.waiverNote}</p>}
+                </div>
+                <Pill tone="good">{signed(m.gain)}</Pill>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      <p className="mt-3 text-sm text-muted">{footer}</p>
+    </Card>
+  );
+}
+
+// Who on Dylan's team is playing above or below his usual level over the last 15 days.
+function FormCard({ snap }: { snap: Snapshot }) {
+  const items = scoringItems(snap);
+  const rows = roster(snap, snap.myTeamId)
+    .map((p) => ({ p, f: formOf(p, items) }))
+    .filter((x) => x.f.trend && x.f.recentPpg !== null)
+    .sort((a, b) => (b.f.recentPpg! - b.f.seasonPpg) - (a.f.recentPpg! - a.f.seasonPpg));
+  return (
+    <Card title="Hot and cold" aside={<span className="text-xs text-muted">Last 15 days vs season</span>}>
+      {rows.length === 0 ? (
+        <p className="text-muted">Nobody on your team is far off his usual pace.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {rows.map(({ p, f }) => (
+            <li key={p.id} className="flex items-center justify-between gap-2 py-2">
+              <PlayerName player={p} />
+              <span className="shrink-0 text-sm tabular">
+                <span className={f.trend === "hot" ? "font-bold text-good" : "font-bold text-bad"}>
+                  {f.trend === "hot" ? "🔥" : "🧊"} {pts(f.recentPpg!)}
+                </span>{" "}
+                <span className="text-muted">vs {pts(f.seasonPpg)}/g</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-muted">
+        Recent form counts for 30% of a player&apos;s value once he has 5+ games in the last 15 days. Hot streaks are a good time to
+        sell high in a trade; cold stars are a good time to buy low.
+      </p>
+    </Card>
+  );
+}
+
+function MatchupCard({ m, bbm, playoffs }: { m: MatchupView; bbm: boolean; playoffs: boolean }) {
   const myFinal = m.mine.current + m.mine.projectedAdd;
   const theirFinal = m.theirs.current + m.theirs.projectedAdd;
   const ahead = myFinal >= theirFinal;
@@ -86,8 +161,8 @@ function MatchupCard({ m, bbm }: { m: MatchupView; bbm: boolean }) {
           {gameEdge > 0
             ? `You have ${gameEdge} more ${gameEdge === 1 ? "game" : "games"} in your lineup. Keep that edge.`
             : gameEdge < 0
-              ? `They have ${-gameEdge} more ${gameEdge === -1 ? "game" : "games"}. Pick up players with games to catch up.`
-              : "Even on games. One good pickup can tip it."}
+              ? `They have ${-gameEdge} more ${gameEdge === -1 ? "game" : "games"}.${playoffs ? " Pick up players with games to catch up." : " Over a season, games even out; player quality wins."}`
+              : "Even on games."}
         </p>
       </div>
       <p className="mt-2 text-xs text-muted">

@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/", label: "This week", icon: "🏀" },
+  { href: "/", label: "Home", icon: "🏀" },
   { href: "/why", label: "Why", icon: "🔍" },
+  { href: "/lineup", label: "Lineup", icon: "📋" },
   { href: "/games", label: "Games", icon: "📅" },
   { href: "/playoffs", label: "Playoffs", icon: "🏆" },
   { href: "/trade", label: "Trade", icon: "🔁" },
-  { href: "/learn", label: "Learn", icon: "💡" },
 ];
 
 // Bottom tab bar on phones, top links on wider screens.

@@ -6,9 +6,15 @@ export default function LearnPage() {
     <div className="flex flex-col gap-4">
       <Card title="The game plan in 3 steps">
         <ol className="flex list-decimal flex-col gap-2 pl-5">
-          <li>Check this week&apos;s matchup. Who has more games left?</li>
-          <li>Pick up free agents who play 3–4 games this week, and drop your players with the fewest games.</li>
-          <li>Near the trade deadline, trade for players with 4-game weeks in the fantasy playoffs.</li>
+          <li>
+            During the season, build the best roster: trade for players who score more in your league&apos;s scoring (big
+            rebounders, double-double guys) and pick up players who are playing well.
+          </li>
+          <li>Watch who&apos;s hot and cold. Sell a player on a hot streak; buy a star who&apos;s in a slump.</li>
+          <li>
+            In the fantasy playoffs, games matter most: stream players with 3–4 games that week, and before the trade deadline trade
+            for 4-4-4 schedules.
+          </li>
         </ol>
       </Card>
       <Card title="Words to know">

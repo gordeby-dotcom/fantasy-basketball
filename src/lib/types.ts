@@ -1,3 +1,5 @@
+import type { TradeIdea } from "./analysis/trades";
+
 // The normalized data the sync job stores and every page reads. Built from ESPN plus Basketball Monster.
 
 export type StatLine = Record<number, number>; // ESPN stat ID -> per-game value
@@ -29,6 +31,8 @@ export interface Player {
   projBbm?: StatLine; // BBM season stats before blending
   bbmGames?: number; // games behind the BBM stats
   bbmWeight?: number; // share of the blend from BBM, 0 to 1
+  projSeason?: StatLine; // the season line before recent form was mixed in
+  formWeight?: number; // share of proj from the last 15 days (0 until he has enough recent games)
   recent?: StatLine; // last-15-day per-game actuals, for context
 }
 
@@ -99,5 +103,6 @@ export interface Snapshot {
   players: Record<number, Player>;
   proGames: Record<number, number[]>; // pro team ID -> scoring periods with a game
   actuals?: MatchupActuals; // the current matchup so far
+  tradeIdeas?: TradeIdea[]; // computed at sync time; the search takes a few hundred ms
   sources: { espn: SourceStatus; bbm: SourceStatus };
 }

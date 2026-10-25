@@ -17,9 +17,19 @@ export interface TradePlayer {
   gap: ProjectionGap | null;
 }
 
-export function TradeForm({ mine, others, initialGive }: { mine: TradePlayer[]; others: TradePlayer[]; initialGive: number[] }) {
+export function TradeForm({
+  mine,
+  others,
+  initialGive,
+  initialGet = [],
+}: {
+  mine: TradePlayer[];
+  others: TradePlayer[];
+  initialGive: number[];
+  initialGet?: number[];
+}) {
   const [give, setGive] = useState<number[]>(initialGive.filter((id) => mine.some((p) => p.id === id)));
-  const [get, setGet] = useState<number[]>([]);
+  const [get, setGet] = useState<number[]>(initialGet.filter((id) => others.some((p) => p.id === id)));
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<TradeResult | null>(null);
   const [pending, start] = useTransition();
