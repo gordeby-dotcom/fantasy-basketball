@@ -5,6 +5,16 @@ function read(name: string): string {
   return (process.env[name] ?? "").trim();
 }
 
+// First non-empty variable named exactly one of `names`, or ending in `_<name>` (a prefixed copy).
+function findSuffix(names: string[]): string {
+  for (const name of names) {
+    if (read(name)) return read(name);
+    const prefixed = Object.keys(process.env).find((k) => k.endsWith(`_${name}`) && read(k));
+    if (prefixed) return read(prefixed);
+  }
+  return "";
+}
+
 export const env = {
   espn: {
     leagueId: () => read("ESPN_LEAGUE_ID"),
@@ -20,10 +30,11 @@ export const env = {
   sitePassword: () => read("SITE_PASSWORD"),
   authSecret: () => read("AUTH_SECRET") || read("SITE_PASSWORD"),
   cronSecret: () => read("CRON_SECRET"),
-  // Vercel's Upstash integration names these KV_REST_API_*; a direct Upstash setup uses UPSTASH_REDIS_REST_*.
+  // Vercel's Upstash integration names these KV_REST_API_*, with an optional custom prefix (e.g. STORAGE_KV_REST_API_URL);
+  // a direct Upstash setup uses UPSTASH_REDIS_REST_*.
   redis: {
-    url: () => read("UPSTASH_REDIS_REST_URL") || read("KV_REST_API_URL"),
-    token: () => read("UPSTASH_REDIS_REST_TOKEN") || read("KV_REST_API_TOKEN"),
+    url: () => findSuffix(["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"]),
+    token: () => findSuffix(["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"]),
   },
   onVercel: () => Boolean(read("VERCEL")),
 };

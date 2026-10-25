@@ -34,7 +34,12 @@ export async function setValue<T>(key: string, value: T): Promise<void> {
     return;
   }
   // Vercel's file system is read-only, so the local-file fallback can't work there.
-  if (env.onVercel()) throw new StoreError("No cache store: add Upstash Redis to this Vercel project.");
+  if (env.onVercel()) {
+    throw new StoreError(
+      "No cache store: connect Upstash Redis in the Vercel project's Storage tab, then redeploy. " +
+        "The app looks for KV_REST_API_URL and KV_REST_API_TOKEN (any prefix) or UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
+    );
+  }
   await fs.mkdir(FILE_DIR, { recursive: true });
   await fs.writeFile(path.join(FILE_DIR, `${key}.json`), JSON.stringify(value));
 }
