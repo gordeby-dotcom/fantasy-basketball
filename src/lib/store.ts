@@ -43,3 +43,17 @@ export async function setValue<T>(key: string, value: T): Promise<void> {
   await fs.mkdir(FILE_DIR, { recursive: true });
   await fs.writeFile(path.join(FILE_DIR, `${key}.json`), JSON.stringify(value));
 }
+
+// For the diagnostics page: which store is in use, and whether a write and read round-trip works.
+export async function checkStore(): Promise<{ kind: "redis" | "file" | "none"; ok: boolean; message?: string }> {
+  const r = redis();
+  if (!r) return env.onVercel() ? { kind: "none", ok: false, message: "No Upstash variables found" } : { kind: "file", ok: true };
+  try {
+    const stamp = String(Date.now());
+    await r.set("health-check", stamp);
+    const back = await r.get<string | number>("health-check");
+    return String(back) === stamp ? { kind: "redis", ok: true } : { kind: "redis", ok: false, message: "Read back a different value" };
+  } catch (err) {
+    return { kind: "redis", ok: false, message: err instanceof Error ? err.message.slice(0, 200) : "Redis call failed" };
+  }
+}
