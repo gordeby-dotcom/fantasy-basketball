@@ -8,6 +8,8 @@ import { env } from "./env";
 
 const FILE_DIR = path.join(process.cwd(), ".data");
 
+export class StoreError extends Error {}
+
 function redis(): Redis | null {
   const url = env.redis.url();
   const token = env.redis.token();
@@ -31,6 +33,8 @@ export async function setValue<T>(key: string, value: T): Promise<void> {
     await r.set(key, value);
     return;
   }
+  // Vercel's file system is read-only, so the local-file fallback can't work there.
+  if (env.onVercel()) throw new StoreError("No cache store: add Upstash Redis to this Vercel project.");
   await fs.mkdir(FILE_DIR, { recursive: true });
   await fs.writeFile(path.join(FILE_DIR, `${key}.json`), JSON.stringify(value));
 }

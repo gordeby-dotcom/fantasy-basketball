@@ -20,8 +20,10 @@ export const env = {
   sitePassword: () => read("SITE_PASSWORD"),
   authSecret: () => read("AUTH_SECRET") || read("SITE_PASSWORD"),
   cronSecret: () => read("CRON_SECRET"),
+  // Vercel's Upstash integration names these KV_REST_API_*; a direct Upstash setup uses UPSTASH_REDIS_REST_*.
   redis: {
-    url: () => read("UPSTASH_REDIS_REST_URL"),
-    token: () => read("UPSTASH_REDIS_REST_TOKEN"),
+    url: () => read("UPSTASH_REDIS_REST_URL") || read("KV_REST_API_URL"),
+    token: () => read("UPSTASH_REDIS_REST_TOKEN") || read("KV_REST_API_TOKEN"),
   },
+  onVercel: () => Boolean(read("VERCEL")),
 };

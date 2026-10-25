@@ -1,6 +1,6 @@
 import "server-only";
 import { env } from "./env";
-import { getValue, setValue } from "./store";
+import { getValue, setValue, StoreError } from "./store";
 import { BbmError, fetchBbmRankings, normalizeName, type BbmProjection } from "./bbm";
 import { EspnError, fetchFreeAgents, fetchLeague, fetchMatchupDay, fetchProSchedule } from "./espn/client";
 import {
@@ -153,6 +153,11 @@ async function loadActuals(
   }
 }
 
+// Stats come with 15+ decimal places; 3 is plenty and roughly halves the stored snapshot.
+function compactNumbers<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value, (_, v) => (typeof v === "number" && !Number.isInteger(v) ? Math.round(v * 1000) / 1000 : v)));
+}
+
 function safeTradeIdeas(snapshot: Snapshot): Snapshot["tradeIdeas"] {
   try {
     return findTrades(snapshot);
@@ -237,11 +242,13 @@ export async function runSync(): Promise<Snapshot> {
       sources: { espn: { ok: true, at: Date.now() }, bbm: bbm.status },
     };
     snapshot.tradeIdeas = safeTradeIdeas(snapshot);
-    await setValue(SNAPSHOT_KEY, snapshot);
-    return snapshot;
+    const compact = compactNumbers(snapshot);
+    await setValue(SNAPSHOT_KEY, compact);
+    return compact;
   } catch (err) {
     await bbmPromise.catch(() => undefined);
-    const message = err instanceof EspnError ? err.message : "The ESPN sync failed unexpectedly.";
+    const message =
+      err instanceof EspnError || err instanceof StoreError ? err.message : "The ESPN sync failed unexpectedly.";
     console.error("ESPN sync failed:", err instanceof Error ? err.message : "unknown error");
     if (!previous) throw new EspnError(message, err instanceof EspnError ? err.kind : "network");
     // Keep the last good data on screen and flag ESPN in the banner.

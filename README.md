@@ -32,10 +32,12 @@ Sign in at fantasy.espn.com in a desktop browser, then go to DevTools → Applic
 
 ## Deploy (Vercel)
 
-1. Push to a private GitHub repo and import it in Vercel.
-2. Add Upstash Redis from the Vercel Marketplace (it sets `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`).
-3. Add the other `.env` values as project environment variables. Use long random values for `AUTH_SECRET` and `CRON_SECRET`.
-4. Deploy, sign in, and press Refresh once. The daily cron takes over from there.
+1. In Vercel, **Add New → Project**, import `gordeby-dotcom/fantasy-basketball`, and keep the Next.js defaults. Production branch: `main`.
+2. In the project's **Storage** tab, add **Upstash for Redis** (free plan) and connect it to the project. It adds `KV_REST_API_URL` / `KV_REST_API_TOKEN`, which the app reads. Without it, syncing fails with a "No cache store" banner, because Vercel's file system is read-only.
+3. In **Settings → Environment Variables**, paste the values from `.env`: `ESPN_LEAGUE_ID`, `ESPN_SEASON`, `ESPN_S2`, `ESPN_SWID`, `BBM_USERNAME`, `BBM_PASSWORD`, `SITE_PASSWORD`, `AUTH_SECRET`, `CRON_SECRET`. The ESPN username and password aren't used, so leave them out.
+4. Redeploy so the variables take effect, open the site, sign in with `SITE_PASSWORD`, and press **Load my league** once. After that, the daily cron (10:00 UTC, set in `vercel.json`) keeps the data fresh; Vercel sends `CRON_SECRET` with each run.
+
+Every push to `main` redeploys.
 
 ## League facts (from ESPN, Oct 2026)
 
