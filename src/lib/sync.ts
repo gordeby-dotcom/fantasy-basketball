@@ -2,7 +2,7 @@ import "server-only";
 import { env } from "./env";
 import { getValue, setValue, StoreError } from "./store";
 import { BbmError, fetchBbmRankings, normalizeName, type BbmProjection } from "./bbm";
-import { EspnError, fetchFreeAgents, fetchLeague, fetchMatchupDay, fetchProSchedule } from "./espn/client";
+import { EspnError, fetchFreeAgents, fetchLeague, fetchMatchupDay, fetchProSchedule, fetchTrendingFreeAgents } from "./espn/client";
 import {
   completeStatLine,
   parseMatchupPeriods,
@@ -175,7 +175,11 @@ export async function runSync(): Promise<Snapshot> {
   try {
     const [league, proTeams] = await Promise.all([fetchLeague(), fetchProSchedule()]);
     const currentScoringPeriod: number = league.scoringPeriodId ?? league.status?.latestScoringPeriod ?? 1;
-    const freeAgents = await fetchFreeAgents(currentScoringPeriod);
+    const [freeAgents, trending] = await Promise.all([
+      fetchFreeAgents(currentScoringPeriod),
+      // Optional extra pool: if ESPN rejects this query, carry on with the main list.
+      fetchTrendingFreeAgents(currentScoringPeriod).catch(() => []),
+    ]);
 
     const { type, items } = parseScoring(league);
     const { teams, rostered } = parseTeams(league, season);
@@ -190,7 +194,7 @@ export async function runSync(): Promise<Snapshot> {
 
     const players: Record<number, Player> = {};
     for (const p of rostered) players[p.id] = p;
-    for (const e of freeAgents) {
+    for (const e of [...freeAgents, ...trending]) {
       const p = parsePlayer(e, season);
       if (!players[p.id]) players[p.id] = p;
     }

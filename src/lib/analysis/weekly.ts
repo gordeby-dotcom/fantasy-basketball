@@ -2,6 +2,7 @@ import { STAT } from "../espn/constants";
 import { firstAvailableSp, gamesIn, isAvailable, makeCtx, playsOn, simulate, type Ctx, type DayPlan } from "./lineup";
 import { isPointsLeague, pointsPerGame, projectionGap, scoringItems, statLong, statShort, type ProjectionGap } from "./scoring";
 import { formOf } from "./value";
+import { nights, type Volume } from "./schedule";
 import type { Player, ScoringItem, Snapshot } from "../types";
 
 export function roster(snap: Snapshot, teamId: number): Player[] {
@@ -145,7 +146,7 @@ export interface GridRow {
 
 export interface GridView {
   period: number;
-  days: { sp: number; date: string; past: boolean }[];
+  days: { sp: number; date: string; past: boolean; nbaGames: number; volume: Volume }[];
   rows: GridRow[];
   lineup: DayPlan[]; // Dylan's lineup per day, for open-slot and too-many-players flags
   slotsPerDay: number;
@@ -172,7 +173,7 @@ export function buildGrid(snap: Snapshot, period: number, freeAgentCount = 25): 
     .reduce((n, [, c]) => n + c, 0);
   return {
     period,
-    days: sps.map((sp) => ({ sp, date: snap.scoringPeriodDates[sp] ?? "", past: sp < snap.currentScoringPeriod })),
+    days: nights(snap, sps).map((n) => ({ sp: n.sp, date: n.date, past: n.sp < snap.currentScoringPeriod, nbaGames: n.games, volume: n.volume })),
     rows: [...mine, ...fas],
     lineup: simulate(ctx, roster(snap, snap.myTeamId), upcoming).days,
     slotsPerDay,

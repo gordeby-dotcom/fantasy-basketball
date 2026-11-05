@@ -57,6 +57,18 @@ export const GLOSSARY = {
     term: "Rest of season",
     text: "Every game from today through the last fantasy playoff week.",
   },
+  quietNight: {
+    term: "Quiet night",
+    text: "A night with only a few NBA games. Few of your players play, so you have open lineup spots, and a pickup who plays that night adds points for sure.",
+  },
+  busyNight: {
+    term: "Busy night",
+    text: "A night with lots of NBA games. Your lineup may already be full, so a pickup who plays only that night might sit on your bench.",
+  },
+  injuryOpening: {
+    term: "Injury opening",
+    text: "When a team's starter is hurt, his minutes go to teammates. A backup who suddenly plays more can be a great short-term pickup, until the starter returns.",
+  },
   waivers: {
     term: "Waivers",
     text: "A recently dropped player sits on waivers for a short time before anyone can add him. Teams put in claims, and the claim clears later.",

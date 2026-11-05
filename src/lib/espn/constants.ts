@@ -19,7 +19,8 @@ export const STAT = {
   FGMI: 23,
   FTMI: 24,
   TPMI: 25,
-  MIN: 28,
+  MPG: 28,
+  MIN: 40, // minutes; in averageStats this is minutes per game
   DD: 37,
   TD: 38,
   QD: 39,

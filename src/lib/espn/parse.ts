@@ -43,6 +43,7 @@ export function parsePlayer(entry: RawPlayerEntry, season: number, onTeamId = 0,
   const thisSeason = statBlock(p, `00${season}`);
   const lastSeason = statBlock(p, `00${season - 1}`);
   const recent = statBlock(p, `02${season}`);
+  const last7 = statBlock(p, `01${season}`);
 
   // Prefer ESPN's projection; fall back to last season, then this season's actuals.
   const base = projection ?? lastSeason ?? thisSeason;
@@ -72,6 +73,14 @@ export function parsePlayer(entry: RawPlayerEntry, season: number, onTeamId = 0,
     proj,
     projSource: base ? "espn" : "none",
     recent,
+    minutes: {
+      projected: projection?.[STAT.MIN],
+      season: thisSeason?.[STAT.MIN],
+      seasonGames: thisSeason?.[STAT.GP],
+      last7: last7?.[STAT.MIN],
+      last7Games: last7?.[STAT.GP],
+    },
+    ownershipChange: p.ownership?.percentChange ?? 0,
   };
 }
 

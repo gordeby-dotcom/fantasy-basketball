@@ -34,6 +34,14 @@ export interface Player {
   projSeason?: StatLine; // the season line before recent form was mixed in
   formWeight?: number; // share of proj from the last 15 days (0 until he has enough recent games)
   recent?: StatLine; // last-15-day per-game actuals, for context
+  minutes?: {
+    projected?: number; // ESPN's projected minutes per game
+    season?: number; // minutes per game this season
+    seasonGames?: number;
+    last7?: number; // minutes per game over the last 7 days
+    last7Games?: number;
+  };
+  ownershipChange?: number; // change in % owned across ESPN leagues this week (trending adds)
 }
 
 export interface Team {

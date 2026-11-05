@@ -3,7 +3,8 @@ import { Card, GapNote, Pill, PlayerName } from "@/components/ui";
 import { Term } from "@/components/Term";
 import { GroupedTradeIdeas } from "@/components/TradeIdeas";
 import { analyzeMatchup, roster, suggestMoves, type MatchupView, type StatRow, type Suggestion } from "@/lib/analysis/weekly";
-import { buildPlayoffView, playoffMode, restOfSeasonSps } from "@/lib/analysis/playoffs";
+import { buildPlayoffView, playoffMode } from "@/lib/analysis/playoffs";
+import { waiverPriority } from "@/lib/analysis/waiver";
 import { scoringItems } from "@/lib/analysis/scoring";
 import { formOf } from "@/lib/analysis/value";
 import { dayShort, monthDay, pts, signed } from "@/lib/format";
@@ -16,32 +17,22 @@ export default async function Home() {
   const matchup = analyzeMatchup(snap);
   const playoffs = playoffMode(snap);
   const closeStats = matchup.stats.filter((s) => s.label === "close").map((s) => s.statId);
-  // Regular season: pickups are about better players for the long run. Playoffs: games this week.
-  const moves = playoffs ? suggestMoves(snap, closeStats) : suggestMoves(snap, closeStats, 3, "season", restOfSeasonSps(snap));
   const bbm = Object.values(snap.players).some((p) => p.projSource === "bbm");
-
-  const movesCard = (
-    <MovesCard
-      moves={moves}
-      title={playoffs ? "Best moves this week" : "Best pickups"}
-      footer={
-        playoffs ? (
-          <>
-            Why? <Term k="streaming">Streaming</Term> players with more games adds points, and it matters most in the playoffs.
-          </>
-        ) : (
-          <>Based on points per game for the rest of the season, including how they&apos;ve played lately.</>
-        )
-      }
-    />
-  );
 
   if (playoffs) {
     return (
       <div className="flex flex-col gap-4">
         <PlayoffHeadline snap={snap} />
         <MatchupCard m={matchup} bbm={bbm} playoffs />
-        {movesCard}
+        <MovesCard
+          moves={suggestMoves(snap, closeStats)}
+          title="Best moves this week"
+          footer={
+            <>
+              Why? <Term k="streaming">Streaming</Term> players with more games adds points, and it matters most in the playoffs.
+            </>
+          }
+        />
         <StatsCard m={matchup} />
         <LineupGaps m={matchup} />
       </div>
@@ -54,11 +45,47 @@ export default async function Home() {
         <GroupedTradeIdeas ideas={snap.tradeIdeas ?? []} snap={snap} items={items} perGroup={1} />
       </Card>
       <FormCard snap={snap} />
-      {movesCard}
+      <WaiverCard snap={snap} />
       <StatsCard m={matchup} />
       <LineupGaps m={matchup} />
       <PlayoffHeadline snap={snap} quiet />
     </div>
+  );
+}
+
+// Regular season: the top of the waiver priority (bigger roles, quiet-night games, long-term value).
+function WaiverCard({ snap }: { snap: Snapshot }) {
+  const { picks } = waiverPriority(snap, 3);
+  return (
+    <Card title="Best pickups" aside={<Link href="/pickups" className="text-sm font-semibold text-accent">Waiver wire →</Link>}>
+      {picks.length === 0 ? (
+        <p className="text-muted">No free agent beats your current roster right now.</p>
+      ) : (
+        <ol className="flex flex-col gap-3">
+          {picks.map((p, i) => (
+            <li key={p.add.id} className="rounded-xl bg-bg p-3">
+              <div className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-x-2">
+                    <span className="font-bold text-good">Add</span> <PlayerName player={p.add} />
+                  </p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-sm">
+                    <span className="font-bold text-bad">Drop</span> <PlayerName player={p.drop} showTeam={false} />
+                  </p>
+                  <p className="mt-1.5 text-sm">{p.reason}</p>
+                </div>
+                <Pill tone="good">{signed(p.next7Gain)}</Pill>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      <p className="mt-3 text-sm text-muted">
+        Counts <Term k="injuryOpening">injury openings</Term>, minutes changes and <Term k="quietNight">quiet nights</Term>. One
+        claim a week? Take #1.
+      </p>
+    </Card>
   );
 }
 

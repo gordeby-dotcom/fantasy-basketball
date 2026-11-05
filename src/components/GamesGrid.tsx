@@ -8,6 +8,9 @@ import type { GridRow, GridView } from "@/lib/analysis/weekly";
 
 type Sort = "games" | "points";
 
+// Quiet nights (few NBA games) are when your lineup has open spots; busy nights are when it fills up.
+const VOLUME_BG = { light: "bg-good-soft text-good", normal: "", heavy: "bg-warn-soft text-warn" } as const;
+
 export function GamesGrid({ grid }: { grid: GridView }) {
   const [sort, setSort] = useState<Sort>("games");
   const order = (a: GridRow, b: GridRow) =>
@@ -44,10 +47,16 @@ export function GamesGrid({ grid }: { grid: GridView }) {
             <tr className="text-xs text-muted">
               <th className="sticky left-0 z-10 bg-card py-2 pr-2 text-left font-medium">Player</th>
               {grid.days.map((d) => (
-                <th key={d.sp} className={`py-2 text-center font-medium ${d.past ? "opacity-40" : ""}`}>
+                <th
+                  key={d.sp}
+                  title={`${d.nbaGames} NBA games${d.volume === "light" ? " (quiet night)" : d.volume === "heavy" ? " (busy night)" : ""}`}
+                  className={`py-2 text-center font-medium ${d.past ? "opacity-40" : ""} ${VOLUME_BG[d.volume]}`}
+                >
                   {dayShort(d.date).slice(0, 2)}
                   <br />
                   {dayNum(d.date)}
+                  <br />
+                  <span className="text-[10px] tabular">{d.nbaGames}g</span>
                 </th>
               ))}
               <th className="py-2 text-center font-medium">G</th>
@@ -91,7 +100,9 @@ export function GamesGrid({ grid }: { grid: GridView }) {
         Lineup row: <span className="font-bold text-warn">3</span> = <Term k="openSlot">open spots</Term>,{" "}
         <span className="font-bold text-bad">+1</span> = <Term k="benched">players stuck on the bench</Term>,{" "}
         <span className="font-bold text-good">✓</span> = full. G = games left, Pts = <Term k="projected">projected points</Term>{" "}
-        for them. WV = on waivers. ⚖️ = <Term k="sources">BBM and ESPN disagree</Term>.
+        for them. WV = on waivers. ⚖️ = <Term k="sources">BBM and ESPN disagree</Term>. Day headers show NBA games that
+        night: <span className="rounded bg-good-soft px-1 text-good">green</span> = <Term k="quietNight">quiet night</Term>,{" "}
+        <span className="rounded bg-warn-soft px-1 text-warn">orange</span> = <Term k="busyNight">busy night</Term>.
       </p>
     </div>
   );

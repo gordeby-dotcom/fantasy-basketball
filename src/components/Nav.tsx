@@ -7,6 +7,7 @@ const TABS = [
   { href: "/", label: "Home", icon: "🏀" },
   { href: "/why", label: "Why", icon: "🔍" },
   { href: "/lineup", label: "Lineup", icon: "📋" },
+  { href: "/pickups", label: "Pickups", icon: "➕" },
   { href: "/games", label: "Games", icon: "📅" },
   { href: "/playoffs", label: "Playoffs", icon: "🏆" },
   { href: "/trade", label: "Trade", icon: "🔁" },
@@ -24,7 +25,7 @@ export function Nav() {
             <li key={t.href} className="flex-1 sm:flex-none">
               <Link
                 href={t.href}
-                className={`flex h-16 flex-col items-center justify-center gap-0.5 text-xs font-medium sm:h-10 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-4 sm:text-sm ${
+                className={`flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium sm:h-10 sm:flex-row sm:gap-1.5 sm:rounded-full sm:px-4 sm:text-sm ${
                   active ? "text-accent sm:bg-accent-soft" : "text-muted"
                 }`}
               >

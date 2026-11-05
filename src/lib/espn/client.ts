@@ -81,7 +81,28 @@ export async function fetchFreeAgents(scoringPeriodId: number, limit = 150): Pro
       filterRanksForScoringPeriodIds: { value: [scoringPeriodId] },
       filterStatsForTopScoringPeriodIds: {
         value: 5,
-        additionalValue: [`00${season}`, `10${season}`, `02${season}`, `00${season - 1}`],
+        additionalValue: [`00${season}`, `10${season}`, `01${season}`, `02${season}`, `00${season - 1}`],
+      },
+    },
+  };
+  const data = (await espnFetch(leagueUrl(["kona_player_info"], { scoringPeriodId }), filter)) as {
+    players?: RawPlayerEntry[];
+  };
+  return data.players ?? [];
+}
+
+// Free agents being added fastest across ESPN leagues: often players whose role just grew.
+export async function fetchTrendingFreeAgents(scoringPeriodId: number, limit = 60): Promise<RawPlayerEntry[]> {
+  const season = env.espn.season();
+  const filter = {
+    players: {
+      filterStatus: { value: ["FREEAGENT", "WAIVERS"] },
+      filterSlotIds: { value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+      limit,
+      sortPercChanged: { sortPriority: 1, sortAsc: false },
+      filterStatsForTopScoringPeriodIds: {
+        value: 5,
+        additionalValue: [`00${season}`, `10${season}`, `01${season}`, `02${season}`, `00${season - 1}`],
       },
     },
   };
