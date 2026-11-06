@@ -18,6 +18,11 @@ export function pts(n: number): string {
   return Math.round(n).toLocaleString("en-US");
 }
 
+// Fantasy scores come in half points; show them the way ESPN does (904.5, not 905).
+export function score(n: number): string {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
+}
+
 export function signed(n: number): string {
   const r = Math.round(n);
   return `${r > 0 ? "+" : r < 0 ? "−" : ""}${Math.abs(r).toLocaleString("en-US")}`;

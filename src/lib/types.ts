@@ -57,8 +57,10 @@ export interface Matchup {
   matchupPeriodId: number;
   homeTeamId: number;
   awayTeamId: number;
-  homePoints: number;
+  homePoints: number; // completed days only
   awayPoints: number;
+  homeLive?: number; // including tonight's games so far (ESPN's live scoreboard); current matchup only
+  awayLive?: number;
 }
 
 // What actually happened so far in the current matchup, day by day, from ESPN's box scores.

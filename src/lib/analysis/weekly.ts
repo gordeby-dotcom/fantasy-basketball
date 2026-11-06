@@ -33,6 +33,15 @@ export function focusPeriod(snap: Snapshot): { period: number; sps: number[]; in
   return { period: cur + 1, sps: snap.matchupPeriods[cur + 1], inProgress: false };
 }
 
+// The matchup ESPN's scoreboard shows: the current one, through its last day (unlike focusPeriod, which looks
+// ahead to next week on the last day for planning pickups).
+export function scoreboardPeriod(snap: Snapshot): { period: number; sps: number[]; inProgress: boolean } {
+  const cur = snap.currentMatchupPeriod;
+  const days = snap.matchupPeriods[cur] ?? [];
+  const left = days.filter((sp) => sp >= snap.currentScoringPeriod);
+  return { period: cur, sps: left, inProgress: left.length < days.length };
+}
+
 export type StatLabel = "winning" | "close" | "concede";
 
 export interface StatRow {
@@ -50,8 +59,9 @@ export interface MatchupView {
   inProgress: boolean;
   opponentId: number | null;
   opponentName: string;
-  mine: { current: number; projectedAdd: number; gamesLeft: number; startedGamesLeft: number };
-  theirs: { current: number; projectedAdd: number; gamesLeft: number; startedGamesLeft: number };
+  // current: completed days (the projection adds today onward to it); live: ESPN's scoreboard incl. tonight so far
+  mine: { current: number; live: number; projectedAdd: number; gamesLeft: number; startedGamesLeft: number };
+  theirs: { current: number; live: number; projectedAdd: number; gamesLeft: number; startedGamesLeft: number };
   stats: StatRow[];
   pointsLeague: boolean;
   categoriesWon?: { mine: number; theirs: number; tied: number };
@@ -71,13 +81,16 @@ const PERCENT_STATS: Record<number, [number, number]> = { 19: [STAT.FGM, STAT.FG
 export function analyzeMatchup(snap: Snapshot): MatchupView {
   const items = scoringItems(snap);
   const ctx = makeCtx(snap, items);
-  const { period, sps, inProgress } = focusPeriod(snap);
+  const { period, sps, inProgress } = scoreboardPeriod(snap);
   const oppId = opponentId(snap, period);
   const me = simulate(ctx, roster(snap, snap.myTeamId), sps);
   const them = oppId ? simulate(ctx, roster(snap, oppId), sps) : simulate(ctx, [], sps);
   const m = snap.matchups.find((x) => x.matchupPeriodId === period && (x.homeTeamId === snap.myTeamId || x.awayTeamId === snap.myTeamId));
-  const myCurrent = inProgress && m ? (m.homeTeamId === snap.myTeamId ? m.homePoints : m.awayPoints) : 0;
-  const theirCurrent = inProgress && m ? (m.homeTeamId === snap.myTeamId ? m.awayPoints : m.homePoints) : 0;
+  const iAmHome = m?.homeTeamId === snap.myTeamId;
+  const myCurrent = inProgress && m ? (iAmHome ? m.homePoints : m.awayPoints) : 0;
+  const theirCurrent = inProgress && m ? (iAmHome ? m.awayPoints : m.homePoints) : 0;
+  const myLive = inProgress && m ? ((iAmHome ? m.homeLive : m.awayLive) ?? myCurrent) : 0;
+  const theirLive = inProgress && m ? ((iAmHome ? m.awayLive : m.homeLive) ?? theirCurrent) : 0;
   const points = isPointsLeague(snap);
 
   const stats: StatRow[] = [];
@@ -122,8 +135,8 @@ export function analyzeMatchup(snap: Snapshot): MatchupView {
     inProgress,
     opponentId: oppId,
     opponentName: oppId ? teamName(snap, oppId) : "No opponent found",
-    mine: { current: myCurrent, projectedAdd: me.points, gamesLeft: me.totalGames, startedGamesLeft: me.startedGames },
-    theirs: { current: theirCurrent, projectedAdd: them.points, gamesLeft: them.totalGames, startedGamesLeft: them.startedGames },
+    mine: { current: myCurrent, live: myLive, projectedAdd: me.points, gamesLeft: me.totalGames, startedGamesLeft: me.startedGames },
+    theirs: { current: theirCurrent, live: theirLive, projectedAdd: them.points, gamesLeft: them.totalGames, startedGamesLeft: them.startedGames },
     stats,
     pointsLeague: points,
     categoriesWon: points ? undefined : { mine: won, theirs: lost, tied },

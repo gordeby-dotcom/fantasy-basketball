@@ -15,7 +15,7 @@ import {
 } from "./espn/parse";
 import { STAT } from "./espn/constants";
 import { findTrades } from "./analysis/trades";
-import type { MatchupActuals, Player, Snapshot, SourceStatus } from "./types";
+import type { Matchup, MatchupActuals, Player, Snapshot, SourceStatus } from "./types";
 
 const SNAPSHOT_KEY = "snapshot";
 const BBM_KEY = "bbm-rankings";
@@ -118,6 +118,25 @@ async function loadBbm(): Promise<{ rows: BbmProjection[]; status: SourceStatus 
       return { rows: cached.rows, status: { ok: false, at: cached.at, message: `${message} Using stats from an earlier sync.` } };
     }
     return { rows: [], status: { ok: false, at: now, message: `${message} Using ESPN projections instead.` } };
+  }
+}
+
+// ESPN's live scoreboard numbers for the current matchups (they include tonight's games so far; the league
+// view's totalPoints counts completed days only). Optional: on failure the completed-day scores stand.
+async function withLiveScores(matchups: Matchup[], matchupPeriodId: number, scoringPeriodId: number): Promise<Matchup[]> {
+  try {
+    const day = await fetchMatchupDay(scoringPeriodId);
+    const live = new Map<string, { home?: number; away?: number }>();
+    for (const m of day.schedule ?? []) {
+      if (m.matchupPeriodId !== matchupPeriodId || !m.home || !m.away) continue;
+      live.set(`${m.home.teamId}-${m.away.teamId}`, { home: m.home.totalPointsLive, away: m.away.totalPointsLive });
+    }
+    return matchups.map((m) => {
+      const l = m.matchupPeriodId === matchupPeriodId ? live.get(`${m.homeTeamId}-${m.awayTeamId}`) : undefined;
+      return l ? { ...m, homeLive: l.home ?? m.homePoints, awayLive: l.away ?? m.awayPoints } : m;
+    });
+  } catch {
+    return matchups;
   }
 }
 
@@ -239,7 +258,7 @@ export async function runSync(): Promise<Snapshot> {
       tradeDeadline: league.settings?.tradeSettings?.deadlineDate ?? null,
       myTeamId,
       teams,
-      matchups: parseMatchups(league),
+      matchups: await withLiveScores(parseMatchups(league), currentMatchupPeriod, currentScoringPeriod),
       players,
       proGames,
       actuals,

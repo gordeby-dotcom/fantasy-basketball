@@ -7,7 +7,7 @@ import { buildPlayoffView, playoffMode } from "@/lib/analysis/playoffs";
 import { waiverPriority } from "@/lib/analysis/waiver";
 import { scoringItems } from "@/lib/analysis/scoring";
 import { formOf } from "@/lib/analysis/value";
-import { dayShort, monthDay, pts, signed } from "@/lib/format";
+import { dayShort, monthDay, pts, score, signed } from "@/lib/format";
 import { getSnapshot } from "@/lib/sync";
 import type { Snapshot } from "@/lib/types";
 
@@ -158,18 +158,31 @@ function FormCard({ snap }: { snap: Snapshot }) {
 function MatchupCard({ m, bbm, playoffs }: { m: MatchupView; bbm: boolean; playoffs: boolean }) {
   const myFinal = m.mine.current + m.mine.projectedAdd;
   const theirFinal = m.theirs.current + m.theirs.projectedAdd;
-  const ahead = myFinal >= theirFinal;
   const gameEdge = m.mine.startedGamesLeft - m.theirs.startedGamesLeft;
+  // Before the week starts there's no score yet, so lead with the projection.
+  const showLive = m.inProgress;
   return (
     <Card>
       <p className="text-sm text-muted">
-        Week {m.period} {m.inProgress ? `· ${m.daysLeft} days left` : "· starts soon"}
+        Week {m.period} {m.inProgress ? `· ${m.daysLeft} ${m.daysLeft === 1 ? "day" : "days"} left` : "· starts soon"}
       </p>
       <h2 className="text-lg font-bold">You vs {m.opponentName}</h2>
       {m.pointsLeague ? (
         <div className="mt-3 grid grid-cols-2 gap-3 text-center">
-          <Score label="You" value={myFinal} highlight={ahead} sub={m.inProgress ? `${pts(m.mine.current)} so far` : undefined} />
-          <Score label="Them" value={theirFinal} highlight={!ahead} sub={m.inProgress ? `${pts(m.theirs.current)} so far` : undefined} />
+          <Score
+            label={showLive ? "You now" : "You (projected)"}
+            value={showLive ? m.mine.live : myFinal}
+            highlight={showLive ? m.mine.live >= m.theirs.live : myFinal >= theirFinal}
+            sub={showLive ? `Projected final: ${pts(myFinal)}` : undefined}
+            exact={showLive}
+          />
+          <Score
+            label={showLive ? "Them now" : "Them (projected)"}
+            value={showLive ? m.theirs.live : theirFinal}
+            highlight={showLive ? m.theirs.live > m.mine.live : theirFinal > myFinal}
+            sub={showLive ? `Projected final: ${pts(theirFinal)}` : undefined}
+            exact={showLive}
+          />
         </div>
       ) : (
         m.categoriesWon && (
@@ -178,6 +191,9 @@ function MatchupCard({ m, bbm, playoffs }: { m: MatchupView; bbm: boolean; playo
             {m.categoriesWon.tied ? `–${m.categoriesWon.tied}` : ""} <span className="text-base font-normal text-muted">projected categories</span>
           </p>
         )
+      )}
+      {showLive && m.pointsLeague && (
+        <p className="mt-2 text-center text-xs text-muted">Score as of the last update, including tonight&apos;s games so far. Press Refresh to catch up with ESPN.</p>
       )}
       <div className="mt-3 rounded-xl bg-bg p-3 text-sm">
         <p>
@@ -200,11 +216,11 @@ function MatchupCard({ m, bbm, playoffs }: { m: MatchupView; bbm: boolean; playo
   );
 }
 
-function Score({ label, value, highlight, sub }: { label: string; value: number; highlight: boolean; sub?: string }) {
+function Score({ label, value, highlight, sub, exact = false }: { label: string; value: number; highlight: boolean; sub?: string; exact?: boolean }) {
   return (
     <div className={`rounded-xl p-3 ${highlight ? "bg-good-soft" : "bg-bg"}`}>
       <p className="text-sm text-muted">{label}</p>
-      <p className={`text-3xl font-bold tabular ${highlight ? "text-good" : ""}`}>{pts(value)}</p>
+      <p className={`text-3xl font-bold tabular ${highlight ? "text-good" : ""}`}>{exact ? score(value) : pts(value)}</p>
       {sub && <p className="text-xs text-muted">{sub}</p>}
     </div>
   );
